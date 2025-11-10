@@ -1,9 +1,8 @@
 // ==UserScript==
-// @name         Battery Overlay (Estilo Apple)
+// @name         Battery Pro iOS
 // @namespace    http://tampermonkey.net/
-// @version      0.2
-// @description  Muestra el porcentaje de batería en cualquier ventana con un estilo similar al de Apple. Toggle: Ctrl+Shift+B. Arrastrable y recuerda posición.
-// @author       GitHub Copilot ZacheryMar
+// @version      1.0
+// @description  Muestra el porcentaje de batería en cualquier ventana con un estilo Apple. Toggle: Ctrl+Shift+B. Arrastrable y recuerda posición.
 // @match        *://*/*
 // @grant        none
 // @run-at       document-idle
@@ -12,17 +11,13 @@
 (function () {
   'use strict';
 
-  // Solo si el navegador soporta la API de batería
   if (!('getBattery' in navigator)) return;
 
-  // Crear estilos
   const css = `
-// Copyright (c) 2025 GitHub Copilot ZacheryMar
 #battery-overlay-appleish {
   position: fixed;
-  left: 50%;
-  top: 8%;
-  transform: translateX(-50%);
+  left: 20px;          /* Alineado hacia la izquierda */
+  top: 8%;             /* Cerca del borde superior */
   z-index: 2147483647;
   background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(250,250,250,0.88));
   color: #0b0b0b;
@@ -100,16 +95,19 @@
 }
 .batt-charge svg { width:18px; height:18px; display:block; }
 .batt-hidden { display:none !important; }
-
-/* small responsive */
-@media (max-width:400px){ #battery-overlay-appleish{ left: 50%; transform: translateX(-50%); min-width: 180px; } }
+@media (max-width:400px){
+  #battery-overlay-appleish{
+    left: 10px;
+    top: 6%;
+    min-width: 180px;
+  }
+}
 `;
 
   const style = document.createElement('style');
   style.textContent = css;
   document.head.appendChild(style);
 
-  // Crear overlay
   const overlay = document.createElement('div');
   overlay.id = 'battery-overlay-appleish';
   overlay.innerHTML = `
@@ -135,20 +133,16 @@
   const subEl = overlay.querySelector('.batt-sub');
   const chargeBtn = overlay.querySelector('.batt-charge');
 
-  // Mostrar por defecto, pero permitir toggle con atajo Ctrl+Shift+B
   let visible = true;
   function setVisible(v) {
     visible = !!v;
     overlay.style.display = visible ? 'flex' : 'none';
     localStorage.setItem('battery_overlay_visible', visible ? '1' : '0');
   }
-  // restaurar visibilidad previa
-  if (localStorage.getItem('battery_overlay_visible') === '0') setVisible(false);
 
-  // Toggle por clic en el botón
+  if (localStorage.getItem('battery_overlay_visible') === '0') setVisible(false);
   chargeBtn.addEventListener('click', () => setVisible(!visible));
 
-  // Toggle por hotkey Ctrl+Shift+B
   window.addEventListener('keydown', (e) => {
     if (e.ctrlKey && e.shiftKey && e.code === 'KeyB') {
       e.preventDefault();
@@ -156,7 +150,6 @@
     }
   });
 
-  // Mover overlay (drag) y persistir posición
   let dragging = false, startX=0, startY=0, origLeft=0, origTop=0;
   function getSavedPos() {
     try { return JSON.parse(localStorage.getItem('battery_overlay_pos') || 'null'); } catch { return null; }
@@ -166,11 +159,9 @@
   if (saved && Array.isArray(saved)) {
     overlay.style.left = saved[0] + 'px';
     overlay.style.top = saved[1] + 'px';
-    overlay.style.transform = ''; // cancel centering transform
   }
 
   overlay.addEventListener('pointerdown', (ev) => {
-    // solo arrastrar con botón principal y sin seleccionar texto
     if (ev.button !== 0) return;
     dragging = true;
     startX = ev.clientX; startY = ev.clientY;
@@ -179,6 +170,7 @@
     overlay.setPointerCapture(ev.pointerId);
     ev.preventDefault();
   });
+
   window.addEventListener('pointermove', (ev) => {
     if (!dragging) return;
     const dx = ev.clientX - startX;
@@ -187,18 +179,16 @@
     const newTop = Math.max(8, origTop + dy);
     overlay.style.left = newLeft + 'px';
     overlay.style.top = newTop + 'px';
-    overlay.style.transform = ''; // desactivar centrar
   });
+
   window.addEventListener('pointerup', (ev) => {
     if (!dragging) return;
     dragging = false;
     overlay.releasePointerCapture(ev.pointerId);
-    // guardar
     const rect = overlay.getBoundingClientRect();
     savePos(rect.left, rect.top);
   });
 
-  // Función para formatear tiempo restante
   function formatTime(minutes) {
     if (!isFinite(minutes) || minutes <= 0) return '—';
     const h = Math.floor(minutes / 60);
@@ -206,13 +196,12 @@
     return (h ? h + 'h ' : '') + m + 'm';
   }
 
-  // Actualizar UI con objeto BatteryManager
   navigator.getBattery().then(function(battery) {
     function update() {
       const pct = Math.round(battery.level * 100);
       percentEl.textContent = pct + '%';
       fill.style.width = pct + '%';
-      // color según nivel
+
       if (battery.charging) {
         fill.style.background = 'linear-gradient(90deg, #0a84ff, #32d74b)';
       } else if (pct <= 10) {
@@ -222,21 +211,21 @@
       } else {
         fill.style.background = 'linear-gradient(90deg, #4cd964, #32d74b)';
       }
-      const state = battery.charging ? ('Cargando • ' + (battery.chargingTime && battery.chargingTime !== Infinity ? formatTime(battery.chargingTime/60) : '—')) : ('Descargando • ' + (battery.dischargingTime && battery.dischargingTime !== Infinity ? formatTime(battery.dischargingTime/60) : '—'));
+
+      const state = battery.charging
+        ? 'Cargando • ' + (battery.chargingTime && battery.chargingTime !== Infinity ? formatTime(battery.chargingTime/60) : '—')
+        : 'Descargando • ' + (battery.dischargingTime && battery.dischargingTime !== Infinity ? formatTime(battery.dischargingTime/60) : '—');
       subEl.textContent = state;
-      // pequeña animación al cargar
+
       overlay.animate([{ transform: 'translateY(-2px)' }, { transform: 'translateY(0)' }], { duration: 220, easing: 'ease-out' });
     }
 
-    // Eventos
     battery.addEventListener('levelchange', update);
     battery.addEventListener('chargingchange', update);
     battery.addEventListener('chargingtimechange', update);
     battery.addEventListener('dischargingtimechange', update);
-
     update();
   }).catch(() => {
-    // Si falla, ocultar overlay
     overlay.classList.add('batt-hidden');
   });
 
